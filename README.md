@@ -1,4 +1,4 @@
-# Android-Realm
+# [Android-Realm](https://realm.io/docs/java/latest/)
 Android Realm
 
 Realm is a mobile database and a replacement for SQLite
@@ -20,14 +20,26 @@ Realm store data in a universal, table-based format by a C++ core
 * Can’t access objects across threads
 
 
-##Step 1 : Adding Realm to your project
+##Step 1 : Adding Realm to your project and Initialization
 ```
-compile 'io.realm:realm-android:0.84.1'
+Project Gradle file : classpath "io.realm:realm-gradle-plugin:3.7.2"
+Module Gradle File at Top : apply plugin: 'realm-android'
+...
+public class MyApplication extends Application {
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        Realm.init(this);
+        RealmConfiguration config=new RealmConfiguration.Builder()
+                .name("myRealm.realm").build();
+        Realm.setDefaultConfiguration(config);
+    }
+}
 ```
 
 ##Step 2 : Creating a Realm 
 ```
-Realm myRealm = Realm.getInstance(getApplicationContext());
+Realm realm = Realm.getDefaultInstance();
 ```
 Will create Realm File named “default.realm”
 If you want to add another Realm File then
@@ -39,27 +51,48 @@ Realm myOtherRealm = Realm.getInstance(new RealmConfiguration.Builder(context)
 
 ##Step 3 : Creating Realm Object
 ```
-public class Country extends RealmObject {
-   private String name;
-  
-   private int population;
+public class Person extends RealmObject{
+    @PrimaryKey
+    private int id;
 
-   @PrimaryKey
-   private String code;
+    private String firstName, lastName, mobile;
 
-   public Country() { }
+    public int getId() {
+        return id;
+    }
 
-   public String getCode() { return code;   }
+    public void setId(int id) {
+        this.id = id;
+    }
 
-   public void setCode(String code) {   this.code = code;   }
+    public String getFirstName() {
+        return firstName;
+    }
 
-   public String getName() {  return name;  }
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
 
-   public void setName(String name) {   this.name = name;  }
+    public String getLastName() {
+        return lastName;
+    }
 
-   public int getPopulation() {   return population;  }
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
 
-   public void setPopulation(int population) {  this.population = population;  }
+    public String getMobile() {
+        return mobile;
+    }
+
+    public void setMobile(String mobile) {
+        this.mobile = mobile;
+    }
+
+    @Override
+    public String toString() {
+        return id+">>"+firstName+">>"+lastName+">>"+mobile;
+    }
 }
 ```
 
@@ -68,23 +101,31 @@ public class Country extends RealmObject {
 Realm forces you to write all transaction inside a transaction
 ```
 // Option 1
-myRealm.beginTransaction();
-Country country=myRealm.createObject(Country.class);
-country.setName("India");
-country.setPopulation(10000000);
-country.setCode("12");
-myRealm.commitTransaction();
-
+public String savePerson(Person person)
+{
+    myRealm.beginTransaction();
+    Person person=myRealm.createObject(Person.class);
+    person.setId((int)getNewPersonId());
+    person.setFirstName("Kotlin");
+    person.setLastName("Tpoint");
+    person.setMobile("1234567890");
+    myRealm.commitTransaction();
+}
+....
+public long getNewPersonId(){
+        long id=(Long)realm.where(Person.class).max("id");
+        return id+1;
+}
 
 // Option 2
-Country country2 = new Country();
-country2.setName("India");
-country2.setPopulation(25000000);
-country2.setCode("IN");
-
-myRealm.beginTransaction();
-Country copyOfCountry = myRealm.copyToRealm(country2);
-myRealm.commitTransaction();
+ public String savePerson(Person person)
+{
+        person.setId((int)getNewPersonId());
+        realm.beginTransaction();
+        Person newPerson=realm.copyToRealm(person);
+        realm.commitTransaction();
+        return "Success";
+}
 ```
 
 ##Transaction Blocks (no required beginTransaction or commitTransaction
@@ -104,45 +145,38 @@ myRealm.executeTransaction(new Realm.Transaction() {
 ##Update Operation
 
 ```
-myRealm.executeTransaction(new Realm.Transaction() {
-   @Override
-   public void execute(Realm realm) {
-       Country country=myRealm.where(Country.class).equalTo("code","IN").findFirst();
-       if(country!=null) {
-   country.setName("New Country");
-   realm.copyToRealmOrUpdate(country);
-  }
-   }
-});
-```
-
-##Delete Operationmy
-
-```
-Realm.executeTransaction(new Realm.Transaction() {
-   @Override
-   public void execute(Realm realm) {
-       RealmResults<Country> realmResults=myRealm.where(Country.class).findAll();
-       Country country=realmResults.where().equalTo("code","SL").findFirst();
-       country.removeFromRealm();
-   }
-});
-```
-
-##Step 5 : Writing Queries (fetching data)
-```
-RealmResults<Country> countries=myRealm.where(Country.class).findAll();
-
-ArrayList<String> countryList=new ArrayList<>();
-for (Country country : countries) {
-   Log.i("Country",country.getName());
-   countryList.add(country.getName());
+public String updatePerson(Person person)
+{
+        realm.beginTransaction();
+        Person NewPerson=realm.where(Person.class).equalTo("id",person.getId()).findFirst();
+        NewPerson.setFirstName(person.getFirstName());
+        NewPerson.setLastName(person.getLastName());
+        NewPerson.setMobile(person.getMobile());
+        realm.commitTransaction();
+        return "Success";
 }
+```
 
-ArrayAdapter<String> adapter=new ArrayAdapter<String>(RealmSampleActivity.this,
-       android.R.layout.simple_list_item_1,countryList);
+##Delete Person from Database
 
-listview.setAdapter(adapter);
+```
+public String removePerson(int id)
+{
+        realm.beginTransaction();
+        Person person=realm.where(Person.class).equalTo("id",id).findFirst();
+        person.deleteFromRealm();
+        realm.commitTransaction();
+        return "Success";
+}
+```
+
+##Step 5 : Writing Queries to fetch All Persons
+```
+public List<Person> getAllPerson()
+{
+     RealmResults<Person> persons=realm.where(Person.class).findAll();
+     return realm.copyFromRealm(persons);
+}
 ```
 
 
